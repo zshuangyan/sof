@@ -8,7 +8,7 @@ URL = 'http://stackoverflow.com/search?'
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-t', '--tab', choices=['votes', 'relevance'], default='relevance')
+    parser.add_argument('-t', '--tab', choices=['votes', 'relevance'], default='votes')
     parser.add_argument('-p', '--pagesize', type=int, choices=[15, 30, 50], default=15)
     parser.add_argument('q', nargs='+')
     return parser
@@ -36,6 +36,17 @@ def generate_html(result, args):
         for i, title in enumerate(result):
             f.write('<a href="http://stackoverflow.com{}">{}. {}</a></br>'.format(title[1], i + 1, title[0]))
             f.write('\n')
+    try:
+        from selenium import webdriver
+    except ImportError:
+        pass
+    else:
+        import os.path
+        from urllib.parse import urljoin
+        from urllib.request import pathname2url
+        pathname = urljoin('file:', pathname2url(os.path.abspath(filename)))
+        driver = webdriver.Chrome()
+        driver.get(pathname)
 
 
 def command_line_runner():

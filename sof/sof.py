@@ -1,8 +1,11 @@
 import argparse
 import requests
 from lxml import html
+from collections import namedtuple
 
-from .util import Answer
+from .util import remove_duplicate_item
+
+Answer = namedtuple("Answer", ["title", "href"])
 
 URL = 'http://stackoverflow.com/search?'
 
@@ -17,18 +20,25 @@ def get_parser():
 
 def get_answers(params):
     res = requests.get(URL, params=params)
-    print(res.url)
+    print("GET: %s" % res.url)
     page = res.content
     tree = html.fromstring(page)
     answers = tree.xpath("//div[@class='result-link']/*/a")
     answers = [Answer(t.xpath('@title')[0], t.xpath('@href')[0]) for t in answers]
-    seen = set()
-    distinct_answers = []
-    for answer in answers:
-        if answer.title not in seen:
-            seen.add(answer.title)
-            distinct_answers.append(answer)
+    distinct_answers = remove_duplicate_item(answers, key=lambda x: x.title)
     return distinct_answers
+
+
+def parse_answer(answer: Answer, base_url: str):
+    url, idt = answer.href.split("#")
+    url = base_url + url
+    print("%s(%s): " % (answer.title, url))
+    page = requests.get(url).content
+    tree = html.fromstring(page)
+    post_xpath = "//div[@id='answer-%s']//div[@class='post-text']" % idt
+    childs = tree.xpath(post_xpath)[0]
+    contents = '\n'.join([child.text for child in childs.iter() if child.text])
+    print("%s%s\n" % (''.join(contents[:500]), "..." if len(contents) > 500 else ""))
 
 
 def command_line_runner():
@@ -41,7 +51,8 @@ def command_line_runner():
         params[key] = value
     answers = get_answers(params)
     for answer in answers:
-        print("标题: %s\n链接: %s" % (answer.title, answer.href))
+        print("Answers:\n")
+        parse_answer(answer, base_url="http://stackoverflow.com")
 
 
 if __name__ == '__main__':

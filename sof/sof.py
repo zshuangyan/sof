@@ -1,7 +1,8 @@
 import argparse
 import requests
 from lxml import html
-from pprint import pprint
+
+from .util import Answer
 
 URL = 'http://stackoverflow.com/search?'
 
@@ -14,39 +15,20 @@ def get_parser():
     return parser
 
 
-def get_result(params):
-    page = requests.get(URL, params=params).text
+def get_answers(params):
+    res = requests.get(URL, params=params)
+    print(res.url)
+    page = res.content
     tree = html.fromstring(page)
-    titles = tree.xpath("//div[@class='result-link']/span/a")
-    titles = ((t.xpath('@title')[0], t.xpath('@href')[0]) for t in titles)
+    answers = tree.xpath("//div[@class='result-link']/*/a")
+    answers = [Answer(t.xpath('@title')[0], t.xpath('@href')[0]) for t in answers]
     seen = set()
-    titles_distinct = []
-    for t, h in titles:
-        if t not in seen:
-            seen.add(t)
-            titles_distinct.append((t, h))
-    return titles_distinct
-
-
-def generate_html(result, args):
-    name = '_'.join(keyword for keyword in args['q'])
-    ext = '.html'
-    filename = name + ext
-    with open(filename, 'w') as f:
-        for i, title in enumerate(result):
-            f.write('<a href="http://stackoverflow.com{}">{}. {}</a></br>'.format(title[1], i + 1, title[0]))
-            f.write('\n')
-    try:
-        from selenium import webdriver
-    except ImportError:
-        pass
-    else:
-        import os.path
-        from urllib.parse import urljoin
-        from urllib.request import pathname2url
-        pathname = urljoin('file:', pathname2url(os.path.abspath(filename)))
-        driver = webdriver.Chrome()
-        driver.get(pathname)
+    distinct_answers = []
+    for answer in answers:
+        if answer.title not in seen:
+            seen.add(answer.title)
+            distinct_answers.append(answer)
+    return distinct_answers
 
 
 def command_line_runner():
@@ -55,14 +37,12 @@ def command_line_runner():
     params = {}
     for key, value in args.items():
         if isinstance(value, list):
-            value = ' '.join(v for v in value)
+            value = ' '.join(value)
         params[key] = value
-    result = get_result(params)
-    generate_html(result, args)
-    pprint([t[0] for t in result])
+    answers = get_answers(params)
+    for answer in answers:
+        print("标题: %s\n链接: %s" % (answer.title, answer.href))
+
 
 if __name__ == '__main__':
     command_line_runner()
-
-
-

@@ -2,8 +2,10 @@ import argparse
 import requests
 from lxml import html
 from collections import namedtuple
+from colorama import Fore
 
 from .util import remove_duplicate_item
+from .draw import output
 
 Answer = namedtuple("Answer", ["title", "href"])
 
@@ -20,7 +22,7 @@ def get_parser():
 
 def get_answers(params):
     res = requests.get(URL, params=params)
-    print("GET: %s" % res.url)
+    output("GET: %s" % res.url, color=Fore.WHITE)
     page = res.content
     tree = html.fromstring(page)
     answers = tree.xpath("//div[@class='result-link']/*/a")
@@ -30,15 +32,22 @@ def get_answers(params):
 
 
 def parse_answer(answer: Answer, base_url: str):
+    # Todo: 处理不包含#的情况
+    if "#" not in answer.href:
+        contents = "can not resolve when answer id not in href"
+        output(contents, color=Fore.RED)
+        print()
+        return
     url, idt = answer.href.split("#")
     url = base_url + url
-    print("%s(%s): " % (answer.title, url))
+    output("%s (%s): " % (answer.title, url), width=150, color=Fore.YELLOW)
     page = requests.get(url).content
     tree = html.fromstring(page)
     post_xpath = "//div[@id='answer-%s']//div[@class='post-text']" % idt
     childs = tree.xpath(post_xpath)[0]
     contents = '\n'.join([child.text for child in childs.iter() if child.text])
-    print("%s%s\n" % (''.join(contents[:500]), "..." if len(contents) > 500 else ""))
+    output(contents, color=Fore.GREEN)
+    print()
 
 
 def command_line_runner():
@@ -50,8 +59,9 @@ def command_line_runner():
             value = ' '.join(value)
         params[key] = value
     answers = get_answers(params)
+    output("Total Answer num: %s\n" % len(answers), color=Fore.BLUE)
     for answer in answers:
-        print("Answers:\n")
+        output("Answer:", color=Fore.YELLOW)
         parse_answer(answer, base_url="http://stackoverflow.com")
 
 
